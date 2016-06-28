@@ -46,6 +46,9 @@ class BenchTest {
   }
 
   run(onComplete){
+
+    onComplete = onComplete || () => {}
+
     let timer = new Timer().start()
     this.observers.map((o) => o.benchTestEvent('starting', {
       url: this.endpoint.url
@@ -94,24 +97,29 @@ class BenchTests{
     return this
   }
 
-  run(){
+  runSeries(){
     eachInSeries(this.benchTests, (benchTest, next) => {
       benchTest.run(() => {
         next()
       })
     })
   }
-}
 
+  runAsync(){
+    this.benchTests.map((test) => {
+      test.run()
+    })
+  }
+}
 
 let outputLogger = new OutputLogger()
 let benchTests = new BenchTests({
   observers: [outputLogger]
 })
-.add('http://localhost:3001/a')
-.add('http://localhost:3001/b')
-.add('http://localhost:3001/c')
-.add('http://localhost:3001/d')
+
+'some_api_routes'.split('').map((c) => {
+  benchTests.add('http://localhost:3001/' + c)
+})
 
 let instance = server.create()
-benchTests.run()
+benchTests.runAsync()
