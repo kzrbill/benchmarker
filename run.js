@@ -58,12 +58,10 @@ class BenchTest {
     request
       .get(this.endpoint.url)
       .on('error', (err) => {
-        this._onErr(response)
-        done()
+        this._onErr(err, done)
       })
       .on('response', (response) => {
-        this._onResponse(response)
-        done()
+        this._onResponse(response, done)
       })
   }
 
@@ -74,15 +72,17 @@ class BenchTest {
       nanoseconds: this.timer.nanoseconds
     }))
     this.timer.reset()
+    done()
   }
 
   _onErr(err) {
     this.timer.stop()
-    this.observers.map((o) => o.benchTestEvent('complete', {
+    this.observers.map((o) => o.benchTestEvent('error', {
       err: response.statusCode,
       nanoseconds: this.timer.nanoseconds
     }))
     this.timer.reset()
+    done()
   }
 }
 
