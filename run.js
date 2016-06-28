@@ -43,13 +43,14 @@ class BenchTest {
   constructor(url, observers) {
     this.endpoint = new Endpoint(url)
     this.observers = observers || []
+    this.timer = new Timer()
   }
 
-  run(onComplete){
+  run(done){
 
-    onComplete = onComplete || () => {}
+    done = done || () => {}
 
-    let timer = new Timer().start()
+    this.timer.start()
     this.observers.map((o) => o.benchTestEvent('starting', {
       url: this.endpoint.url
     }))
@@ -57,25 +58,31 @@ class BenchTest {
     request
       .get(this.endpoint.url)
       .on('error', (err) => {
-        timer.stop()
-        this.observers.map((o) => o.benchTestEvent('error', {
-          error: err,
-          nanoseconds: timer.nanoseconds
-        }))
-        timer.reset()
-
-        onComplete()
+        this._onErr(response)
+        done()
       })
       .on('response', (response) => {
-        timer.stop()
-        this.observers.map((o) => o.benchTestEvent('complete', {
-          response: response.statusCode,
-          nanoseconds: timer.nanoseconds
-        }))
-        timer.reset()
-
-        onComplete()
+        this._onResponse(response)
+        done()
       })
+  }
+
+  _onResponse(response) {
+    this.timer.stop()
+    this.observers.map((o) => o.benchTestEvent('complete', {
+      response: response.statusCode,
+      nanoseconds: this.timer.nanoseconds
+    }))
+    this.timer.reset()
+  }
+
+  _onErr(err) {
+    this.timer.stop()
+    this.observers.map((o) => o.benchTestEvent('complete', {
+      err: response.statusCode,
+      nanoseconds: this.timer.nanoseconds
+    }))
+    this.timer.reset()
   }
 }
 
