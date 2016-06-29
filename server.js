@@ -11,7 +11,7 @@ module.exports.create = (args) => {
     let randomTime = Math.random()
 
     nanotimer.setTimeout(() => {
-      res.send('Hello client' + nanotimer)
+      res.send('Hello client. Delay ' + randomTime)
     }, '', `${randomTime}s`)
   })
 

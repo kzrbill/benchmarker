@@ -1,9 +1,13 @@
 'use strict'
 
 let request = require('request')
+let axios = require('axios')
 let NanoTimer = require('nanotimer')
 let server = require('./server')
 let eachInSeries = require('async-each-series')
+let async = require('async')
+let logger = require('winston')
+let chalk = require('chalk')
 
 class Endpoint {
   constructor(url) {
@@ -50,28 +54,40 @@ class BenchTest {
 
     done = done || () => {}
 
-    this.timer.start()
-    this.observers.map((o) => o.benchTestEvent('starting', {
+
+    this.observers.map((o) => o.benchTestStarting({
       url: this.endpoint.url
     }))
 
-    // request = require('request')
+    this.timer.start()
+    let instance = axios.create()
 
-    request
-      .get(this.endpoint.url)
-      .on('error', (err) => {
-        this._onErr(err, done)
-      })
-      .on('response', (response) => {
-        this._onResponse(response, done)
-      })
+    instance
+    .get(this.endpoint.url)
+    .then((response) => {
+      this._onResponse(response, done)
+    })
+    .catch((err) => {
+      this._onErr(err, done)
+    })
+
+    // request
+    //   .get(this.endpoint.url)
+    //   .on('error', (err) => {
+    //     this._onErr(err, done)
+    //   })
+    //   .on('response', (response) => {
+    //     this._onResponse(response, done)
+    //   })
   }
 
   _onResponse(response, done) {
     this.timer.stop()
-    this.observers.map((o) => o.benchTestEvent('complete', {
-      response: response.statusCode,
-      nanoseconds: this.timer.nanoseconds
+    this.observers.map((o) => o.benchTestComplete({
+      url: this.endpoint.url,
+      nanoseconds: this.timer.nanoseconds,
+      statusCode: response.status,
+      data: response.data
     }))
     this.timer.reset()
     done()
@@ -79,9 +95,10 @@ class BenchTest {
 
   _onErr(err, done) {
     this.timer.stop()
-    this.observers.map((o) => o.benchTestEvent('error', {
-      err: response.statusCode,
-      nanoseconds: this.timer.nanoseconds
+    this.observers.map((o) => o.benchTestError({
+      url: this.endpoint.url,
+      nanoseconds: this.timer.nanoseconds,
+      error: err
     }))
     this.timer.reset()
     done()
@@ -89,8 +106,21 @@ class BenchTest {
 }
 
 class OutputLogger {
-  benchTestEvent(key, obj){
-    console.log(key, obj)
+  benchTestError(obj){
+    logger.warn(chalk.red('error'), obj)
+  }
+
+  benchTestComplete(obj){
+    logger.info(chalk.green('complete'), {
+      nanoseconds: chalk.green(obj.nanoseconds),
+      url: obj.url
+    })
+  }
+
+  benchTestStarting(obj){
+    logger.info(chalk.yellow('starting'), {
+      url: obj.url
+    })
   }
 }
 
@@ -98,6 +128,7 @@ class BenchTests{
   constructor(args){
     this.observers = args.observers || []
     this.benchTests = []
+    this.totalNanosecs = 0
   }
 
   add(url){
@@ -106,19 +137,24 @@ class BenchTests{
   }
 
   runSeries(){
-    eachInSeries(this.benchTests, (benchTest, next) => {
+    this.totalNanosecs = 0
+    async.eachSeries(this.benchTests, (benchTest, next) => {
       benchTest.run(() => {
         next()
       })
     })
   }
 
-  runAsync(){
-    this.benchTests.map((test) => {
-      test.run()
+  runParallel(){
+    this.totalNanosecs = 0
+    async.each(this.benchTests, (benchTest, done) => {
+      benchTest.run(() => {
+        done()
+      })
     })
   }
 }
+
 
 let outputLogger = new OutputLogger()
 let benchTests = new BenchTests({
@@ -130,4 +166,4 @@ let benchTests = new BenchTests({
 })
 
 let instance = server.create()
-benchTests.runAsync()
+benchTests.runParallel()
