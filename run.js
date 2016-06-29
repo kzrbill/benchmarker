@@ -55,6 +55,8 @@ class BenchTest {
       url: this.endpoint.url
     }))
 
+    // request = require('request')
+
     request
       .get(this.endpoint.url)
       .on('error', (err) => {
@@ -65,7 +67,7 @@ class BenchTest {
       })
   }
 
-  _onResponse(response) {
+  _onResponse(response, done) {
     this.timer.stop()
     this.observers.map((o) => o.benchTestEvent('complete', {
       response: response.statusCode,
@@ -75,7 +77,7 @@ class BenchTest {
     done()
   }
 
-  _onErr(err) {
+  _onErr(err, done) {
     this.timer.stop()
     this.observers.map((o) => o.benchTestEvent('error', {
       err: response.statusCode,
@@ -99,7 +101,6 @@ class BenchTests{
   }
 
   add(url){
-
     this.benchTests.push(new BenchTest(url, this.observers))
     return this
   }
