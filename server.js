@@ -5,13 +5,18 @@ let app = express()
 let NanoTimer = require('nanotimer')
 
 module.exports.create = (args) => {
-  app.get('/*', (req, res) => {
+  app.get('/', (req, res) => {
+    res.send({foo: 'bar'})
+  })
+
+  app.get('/random-delay', (req, res) => {
 
     let nanotimer = new NanoTimer()
     let randomTime = Math.random()
 
     nanotimer.setTimeout(() => {
-      res.send('Hello client. Delay ' + randomTime)
+      let inMS = Math.round(randomTime * 1000)
+      res.send(`delay:${inMS}ms`)
     }, '', `${randomTime}s`)
   })
 

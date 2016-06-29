@@ -15,7 +15,16 @@ class Endpoint {
   }
 }
 
-// https://www.npmjs.com/package/nanotimer
+class Time {
+  constructor(milisecs){
+    this.milisecs = milisecs || 0
+  }
+
+  seconds() {
+    return this.milisecs / 1000.0
+  }
+}
+
 class Timer {
   constructor(){
     this.nanoTimer = new NanoTimer()
@@ -26,7 +35,7 @@ class Timer {
   start(){
     this.nanoTimer.setInterval(() => {
       this.nanoseconds++
-    }, '', `${this.interval}n`)
+    }, '', `${this.interval}m`)
 
     return this
   }
@@ -60,24 +69,26 @@ class BenchTest {
 
     this.timer.start()
 
-    request
-      .get(this.endpoint.url)
-      .on('error', (err) => {
+    request({
+      url: this.endpoint.url
+    }, (err, response, body) => {
+      if (err) {
         this._onErr(err, onComplete)
-      })
-      .on('response', (response) => {
-        this._onResponse(response, onComplete)
-      })
+        return
+      }
+
+      this._onResponse(response, body, onComplete)
+    })
   }
 
-  _onResponse(response, onComplete) {
+  _onResponse(response, body, onComplete) {
     this.timer.stop()
 
     let result = {
       url: this.endpoint.url,
-      nanosecs: this.timer.nanoseconds,
+      milisecs: this.timer.nanoseconds,
       statusCode: response.status,
-      data: response.data
+      body: body
     }
 
     this.observers.map((o) => o.benchTestComplete(result))
@@ -101,15 +112,93 @@ class BenchTest {
   }
 }
 
+class BenchTests{
+  constructor(args){
+    this.observers = args.observers || []
+    this.benchTests = []
+    this.totalMilisecs = 0
+  }
+
+  add(url){
+    this.benchTests.push(new BenchTest(url, this.observers))
+    return this
+  }
+
+  runSeries(){
+    this.totalMilisecs = 0
+    async.eachSeries(this.benchTests, (benchTest, next) => {
+      benchTest.run((result) => {
+        this.totalMilisecs += result.milisecs
+        next()
+      })
+    }, () => {
+      this.observers.map((o) => o.allTestsComplete({
+        totalTestsRun: this.benchTests.length,
+        totalMilisecs: this.totalMilisecs
+      }))
+    })
+  }
+
+  runParallel(){
+    this.totalNanosecs = 0
+    async.each(this.benchTests, (benchTest, done) => {
+      benchTest.run((result) => {
+        this.totalNanosecs += result.milisecs
+        done()
+      })
+    }, () => {
+      this.observers.map((o) => o.allTestsComplete({
+        totalTestsRun: this.benchTests.length,
+        totalMilisecs: this.totalNanosecs
+      }))
+    })
+  }
+}
+
+class BenchLoadTests {
+  constructor(args) {
+    this.args = args
+    this.totalRequests = args.totalRequests || 0
+    this.observers = args.observers || []
+    this.url = args.url || ''
+  }
+
+  run() {
+
+    this.observers.map((o) => {
+      o.allTestsStarted({
+        name: 'Load test',
+        url: this.url,
+        totalRequests: this.totalRequests
+      })
+    })
+
+    let benchTests = new BenchTests({
+      observers: this.observers
+    })
+
+    for(let i = 0; i < this.totalRequests; i++) {
+      benchTests.add(this.url)
+    }
+
+    benchTests.runParallel()
+  }
+}
+
 class OutputLogger {
+  allTestsStarted(args) {
+    logger.info(chalk.black.bold.bgYellow(`${args.name} started for ${args.url} * ${args.totalRequests}`))
+  }
+
   benchTestError(obj){
     logger.warn(chalk.red('error'), obj)
   }
 
-  benchTestComplete(obj){
+  benchTestComplete(results){
     logger.info(chalk.green('complete'), {
-      nanosecs: chalk.green(obj.nanosecs),
-      url: obj.url
+      milisecs: chalk.green(`${results.milisecs}ms`),
+      url: results.url,
+      body: results.body
     })
   }
 
@@ -120,63 +209,17 @@ class OutputLogger {
   }
 
   allTestsComplete(results){
-
-    let resultsStr = `Total time taken: ${results.totalNanosecs}. Total tests run: ${results.totalTestsRun}.`
+    let time = new Time(results.totalMilisecs)
+    let resultsStr = `Time to serve: ${time.seconds()}s. Total endpoints called: ${results.totalTestsRun}.`
     logger.info(chalk.black.bold.bgGreen(resultsStr))
   }
 }
 
-class BenchTests{
-  constructor(args){
-    this.observers = args.observers || []
-    this.benchTests = []
-    this.totalNanosecs = 0
-  }
-
-  add(url){
-    this.benchTests.push(new BenchTest(url, this.observers))
-    return this
-  }
-
-  runSeries(){
-    this.totalNanosecs = 0
-    async.eachSeries(this.benchTests, (benchTest, next) => {
-      benchTest.run((result) => {
-        this.totalNanosecs += result.nanosecs
-        next()
-      })
-    }, () => {
-      this.observers.map((o) => o.allTestsComplete({
-        totalTestsRun: this.benchTests.length,
-        totalNanosecs: this.totalNanosecs
-      }))
-    })
-  }
-
-  runParallel(){
-    this.totalNanosecs = 0
-    async.each(this.benchTests, (benchTest, done) => {
-      benchTest.run((result) => {
-        this.totalNanosecs += result.nanosecs
-        done()
-      })
-    }, () => {
-      this.observers.map((o) => o.allTestsComplete({
-        totalTestsRun: this.benchTests.length,
-        totalNanosecs: this.totalNanosecs
-      }))
-    })
-  }
-}
-
 let outputLogger = new OutputLogger()
-let benchTests = new BenchTests({
+let loadTests = new BenchLoadTests({
+  totalRequests: 100,
+  url: 'http://localhost:3001/random-delay',
   observers: [outputLogger]
-})
-
-'some_api_routes_that_we_can_test'.split('').map((c) => {
-  benchTests.add('http://localhost:3001/' + c)
-})
+}).run()
 
 let instance = server.create()
-benchTests.runSeries()
