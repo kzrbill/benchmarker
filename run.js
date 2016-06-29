@@ -50,58 +50,54 @@ class BenchTest {
     this.timer = new Timer()
   }
 
-  run(done){
+  run(onComplete){
 
-    done = done || () => {}
-
+    onComplete = onComplete || () => {}
 
     this.observers.map((o) => o.benchTestStarting({
       url: this.endpoint.url
     }))
 
     this.timer.start()
-    let instance = axios.create()
 
-    instance
-    .get(this.endpoint.url)
-    .then((response) => {
-      this._onResponse(response, done)
-    })
-    .catch((err) => {
-      this._onErr(err, done)
-    })
-
-    // request
-    //   .get(this.endpoint.url)
-    //   .on('error', (err) => {
-    //     this._onErr(err, done)
-    //   })
-    //   .on('response', (response) => {
-    //     this._onResponse(response, done)
-    //   })
+    request
+      .get(this.endpoint.url)
+      .on('error', (err) => {
+        this._onErr(err, onComplete)
+      })
+      .on('response', (response) => {
+        this._onResponse(response, onComplete)
+      })
   }
 
-  _onResponse(response, done) {
+  _onResponse(response, onComplete) {
     this.timer.stop()
-    this.observers.map((o) => o.benchTestComplete({
+
+    let result = {
       url: this.endpoint.url,
       nanoseconds: this.timer.nanoseconds,
       statusCode: response.status,
       data: response.data
-    }))
+    }
+
+    this.observers.map((o) => o.benchTestComplete(result))
     this.timer.reset()
-    done()
+
+    onComplete(result)
   }
 
-  _onErr(err, done) {
+  _onErr(err, onComplete) {
     this.timer.stop()
-    this.observers.map((o) => o.benchTestError({
+
+    let result = {
       url: this.endpoint.url,
       nanoseconds: this.timer.nanoseconds,
       error: err
-    }))
+    }
+
+    this.observers.map((o) => o.benchTestError(result))
     this.timer.reset()
-    done()
+    onComplete(result)
   }
 }
 
@@ -139,18 +135,26 @@ class BenchTests{
   runSeries(){
     this.totalNanosecs = 0
     async.eachSeries(this.benchTests, (benchTest, next) => {
-      benchTest.run(() => {
+      benchTest.run((result) => {
+        this.totalNanosecs += result.nanoseconds
         next()
       })
+    }, () => {
+      // All done - TODO: notify observers with overall result
+      console.log('total time :', this.totalNanosecs)
     })
   }
 
   runParallel(){
     this.totalNanosecs = 0
     async.each(this.benchTests, (benchTest, done) => {
-      benchTest.run(() => {
+      benchTest.run((result) => {
+        this.totalNanosecs += result.nanoseconds
         done()
       })
+    }, () => {
+      // All done - TODO: notify observers with overall result
+      console.log('total time :', this.totalNanosecs)
     })
   }
 }
