@@ -75,7 +75,7 @@ class BenchTest {
 
     let result = {
       url: this.endpoint.url,
-      nanoseconds: this.timer.nanoseconds,
+      nanosecs: this.timer.nanoseconds,
       statusCode: response.status,
       data: response.data
     }
@@ -108,15 +108,21 @@ class OutputLogger {
 
   benchTestComplete(obj){
     logger.info(chalk.green('complete'), {
-      nanoseconds: chalk.green(obj.nanoseconds),
+      nanosecs: chalk.green(obj.nanosecs),
       url: obj.url
     })
   }
 
   benchTestStarting(obj){
-    logger.info(chalk.yellow('starting'), {
+    logger.info(chalk.yellow('request'), {
       url: obj.url
     })
+  }
+
+  allTestsComplete(results){
+
+    let resultsStr = `Total time taken: ${results.totalNanosecs}. Total tests run: ${results.totalTestsRun}.`
+    logger.info(chalk.black.bold.bgGreen(resultsStr))
   }
 }
 
@@ -136,12 +142,14 @@ class BenchTests{
     this.totalNanosecs = 0
     async.eachSeries(this.benchTests, (benchTest, next) => {
       benchTest.run((result) => {
-        this.totalNanosecs += result.nanoseconds
+        this.totalNanosecs += result.nanosecs
         next()
       })
     }, () => {
-      // All done - TODO: notify observers with overall result
-      console.log('total time :', this.totalNanosecs)
+      this.observers.map((o) => o.allTestsComplete({
+        totalTestsRun: this.benchTests.length,
+        totalNanosecs: this.totalNanosecs
+      }))
     })
   }
 
@@ -149,25 +157,26 @@ class BenchTests{
     this.totalNanosecs = 0
     async.each(this.benchTests, (benchTest, done) => {
       benchTest.run((result) => {
-        this.totalNanosecs += result.nanoseconds
+        this.totalNanosecs += result.nanosecs
         done()
       })
     }, () => {
-      // All done - TODO: notify observers with overall result
-      console.log('total time :', this.totalNanosecs)
+      this.observers.map((o) => o.allTestsComplete({
+        totalTestsRun: this.benchTests.length,
+        totalNanosecs: this.totalNanosecs
+      }))
     })
   }
 }
-
 
 let outputLogger = new OutputLogger()
 let benchTests = new BenchTests({
   observers: [outputLogger]
 })
 
-'some_api_routes'.split('').map((c) => {
+'some_api_routes_that_we_can_test'.split('').map((c) => {
   benchTests.add('http://localhost:3001/' + c)
 })
 
 let instance = server.create()
-benchTests.runParallel()
+benchTests.runSeries()
