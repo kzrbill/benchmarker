@@ -50,6 +50,10 @@ class OutputLogger {
 
     logger.info(chalk.black.bold.bgGreen(resultsArr.join(' ')))
   }
+
+  onProgress(progress){
+    logger.info(progress)
+  }
 }
 
 let outputLogger = new OutputLogger()
