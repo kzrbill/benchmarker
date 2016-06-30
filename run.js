@@ -14,7 +14,7 @@ let BenchLoadTests = bench.BenchLoadTests
 
 class OutputLogger {
   allTestsStarted(args) {
-    logger.info(chalk.black.bold.bgYellow(`${args.name} started for ${args.url} * ${args.totalRequests}`))
+    logger.info(chalk.black.bold.bgYellow(`${args.name} started for ${args.url}. ${args.totalRequests} requests.`))
   }
 
   benchTestError(obj){
@@ -37,8 +37,18 @@ class OutputLogger {
 
   allTestsComplete(results){
     let time = new Time(results.totalMilisecs)
-    let resultsStr = `Time to serve: ${time.seconds()}s. Total endpoints called: ${results.totalTestsRun}.`
-    logger.info(chalk.black.bold.bgGreen(resultsStr))
+    let resultsArr = [
+      `Time to serve: ${time.seconds()}s.`,
+      `Total endpoints called: ${results.totalTestsRun}.`,
+      `Total errors: ${results.totalErrors}.`
+    ]
+
+    if (results.totalErrors > 0) {
+        logger.info(chalk.black.bold.bgRed(resultsArr.join(' ')))
+        return
+    }
+
+    logger.info(chalk.black.bold.bgGreen(resultsArr.join(' ')))
   }
 }
 
