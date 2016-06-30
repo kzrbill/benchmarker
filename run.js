@@ -1,19 +1,18 @@
 'use strict'
 
 let request = require('request')
-let axios = require('axios')
 let NanoTimer = require('nanotimer')
-let server = require('./server')
-let eachInSeries = require('async-each-series')
 let async = require('async')
 let logger = require('winston')
 let chalk = require('chalk')
+let server = require('./server')
 
 class Endpoint {
   constructor(url) {
     this.url = url
   }
 }
+
 
 class Time {
   constructor(milisecs){
@@ -81,6 +80,7 @@ class BenchTest {
     })
   }
 
+
   _onResponse(response, body, onComplete) {
     this.timer.stop()
 
@@ -112,7 +112,7 @@ class BenchTest {
   }
 }
 
-class BenchTests{
+class BenchTests {
   constructor(args){
     this.observers = args.observers || []
     this.benchTests = []
