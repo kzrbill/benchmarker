@@ -15,6 +15,7 @@
     "express": "^4.14.0",
     "mocha": "^2.5.3",
     "nanotimer": "^0.3.14",
+    "progress": "^1.1.8",
     "request": "^2.72.0",
     "should": "^9.0.2",
     "supertest": "^1.2.0",
